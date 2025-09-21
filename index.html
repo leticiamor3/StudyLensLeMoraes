@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini Lens — PDF + PasseiDireto + ChatGPT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --bg1:#ffe4e6; --bg2:#fdf2f8; --fg:#3f3f46; --muted:#6b7280;
+      --card:#ffffffcc; --stroke:#fbcfe8; --accent:#ec4899; --accent-2:#f472b6;
+      --shadow: 0 10px 30px rgba(236,72,153,0.20);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin:0; font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Helvetica Neue, Arial;
+      background: linear-gradient(180deg, var(--bg1), var(--bg2)); color: var(--fg); }
+    .wrap{ max-width:1000px; margin:0 auto; padding:20px; }
+
+    /* Header */
+    .hero { position: relative; overflow: hidden; border-radius: 22px; padding: 22px; background: linear-gradient(135deg, #fb7185 0%, #ec4899 35%, #e879f9 100%); color: #fff; box-shadow: var(--shadow); }
+    .hero .brand { display:flex; align-items:center; gap:12px; }
+    .logo { width:40px; height:40px; border-radius:12px; background:#ffffff22; display:grid; place-items:center; font-weight:700; }
+    .title { font-size: clamp(24px, 4vw, 36px); margin:6px 0 4px; font-weight:700; }
+    .subtitle { opacity: .95; font-size: clamp(12px, 2vw, 14px); }
+    .ribbon { position:absolute; inset:auto -20px -20px -20px; height: 9px; background: linear-gradient(90deg, #fff5, #fff0); filter: blur(2px); }
+
+    /* Card */
+    .card{ background: var(--card); backdrop-filter: blur(8px); border:1px solid var(--stroke); border-radius:20px; padding:18px; box-shadow: var(--shadow); }
+
+    /* Layout */
+    .grid{ display:grid; gap:16px; grid-template-columns: 1fr; }
+    @media(min-width:960px){ .grid{ grid-template-columns: 1.1fr 0.9fr; } }
+
+    /* Buttons */
+    .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    button{ cursor:pointer; border-radius:14px; padding:12px 16px; border:1px solid var(--stroke); background:#fff; color:#7a1143; font-weight:600; box-shadow: 0 2px 8px rgba(236,72,153,0.15); transition: transform .12s ease, box-shadow .12s ease; }
+    button.primary{ background: var(--accent); color:#fff; border-color:transparent; }
+    button.warn{ background:#fce7f3; color:#7a1143; }
+    button:hover{ transform: translateY(-1px); box-shadow: 0 8px 18px rgba(236,72,153,0.25); }
+    button:active{ transform: translateY(0px); }
+    button:disabled{ opacity:.6; cursor:not-allowed; }
+
+    /* Inputs */
+    .pill{ font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid var(--stroke); background:#fff; color:#7a1143; display:inline-flex; gap:8px; align-items:center; }
+    input[type=file]{ accent-color: var(--accent); }
+    video, canvas{ width:100%; max-height:360px; object-fit:contain; background:#fff; border-radius:14px; border:1px solid var(--stroke); }
+    label{ font-size:13px; color:#7a1143; font-weight:600; }
+    textarea{ width:100%; min-height:140px; resize:vertical; padding:12px; border-radius:14px; background:#fff; color:var(--fg); border:1px solid var(--stroke); line-height:1.5; }
+    .hint{ font-size:12px; color:#a1a1aa; }
+
+    /* Steps */
+    .steps{ display:grid; grid-template-columns: repeat(3,1fr); gap:10px; margin-top:12px; }
+    .step{ background:#fff; border:1px solid var(--stroke); border-radius:14px; padding:10px; text-align:center; }
+    .n{ display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background: var(--accent); color:#fff; font-weight:700; margin-bottom:6px; }
+
+    /* Progress bar */
+    .barWrap{ margin-top:10px; background:#fde7f2; border-radius:12px; overflow:hidden; height:12px; border:1px solid var(--stroke); }
+    .bar{ height:100%; width:0%; background:linear-gradient(90deg, var(--accent), var(--accent-2)); transition:width .2s ease; }
+
+    footer{ margin-top:18px; text-align:center; color:#7a1143; }
+    footer a{ color:#9d174d; text-decoration:none; font-weight:700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="brand">
+        <div class="logo">ML</div>
+        <div>
+          <div class="title">Mini Lens — PDF + PasseiDireto + ChatGPT</div>
+          <div class="subtitle">Rápido, simples e feito para universitários: foto → texto → pesquisa com filtros → (opcional) abrir ChatGPT já com o texto copiado.</div>
+        </div>
+      </div>
+      <div class="ribbon"></div>
+    </section>
+
+    <div style="height:14px"></div>
+
+    <div class="grid">
+      <!-- Coluna Esquerda: Câmera/OCR -->
+      <div class="card">
+        <div class="row">
+          <button id="btnCam" class="primary">📷 Abrir câmera</button>
+          <input id="file" type="file" accept="image/*" />
+          <span class="pill" id="status">Pronto</span>
+        </div>
+        <div style="margin-top:10px;">
+          <video id="video" playsinline></video>
+          <canvas id="canvas" style="display:none;"></canvas>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button id="btnTirar">📸 Tirar foto</button>
+          <button id="btnOCR" class="primary">🪄 Rodar OCR</button>
+        </div>
+        <div class="barWrap"><div id="bar" class="bar"></div></div>
+        <div class="steps">
+          <div class="step"><div class="n">1</div><div>Abra a câmera ou selecione a imagem</div></div>
+          <div class="step"><div class="n">2</div><div>Clique em <b>Rodar OCR</b> para extrair o texto</div></div>
+          <div class="step"><div class="n">3</div><div>Pesquise no Google ou abra o ChatGPT</div></div>
+        </div>
+      </div>
+
+      <!-- Coluna Direita: Texto/Busca/ChatGPT -->
+      <div class="card">
+        <label for="texto">Texto reconhecido (edite se quiser)</label>
+        <textarea id="texto" placeholder="O OCR aparece aqui..."></textarea>
+
+        <div class="row">
+          <button id="btnGoogle" class="primary">🔎 Google (PasseiDireto/PDF)</button>
+          <button id="btnGoogleGeral">🌐 Google (Geral)</button>
+        </div>
+
+        <div class="row" style="margin-top:8px;">
+          <button id="btnCopyChat" class="warn" title="Copia o texto e abre o ChatGPT">🤖 Copiar + Abrir ChatGPT</button>
+          <button id="btnCombo" title="Abre Google (preferidos) e depois ChatGPT com o texto copiado">⚡ Combo: Google + ChatGPT</button>
+        </div>
+
+        <div class="hint" style="margin-top:8px;">Dica: se você já estiver logado no ChatGPT no navegador, ao abrir a nova aba é só colar e enviar.</div>
+
+        <div style="margin-top:12px;">
+          <label>Fallback IA (opcional) — URL do seu endpoint</label>
+          <input id="askUrl" style="width:100%; padding:10px; border-radius:12px; border:1px solid var(--stroke); background:#fff; color:var(--fg);" placeholder="https://seu-dominio.workers.dev/api/ask" />
+          <button id="btnAsk" style="margin-top:8px;">Perguntar à IA (Resposta → Depois Cálculo)</button>
+        </div>
+
+        <div style="margin-top:10px;">
+          <label>Resposta da IA</label>
+          <textarea id="ia" placeholder="A resposta da IA aparecerá aqui" readonly></textarea>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <div>Feito por <b>Leticia Francine Moraes</b></div>
+      <div>Instagram: <a href="https://www.instagram.com/le__stars?igsh=dGc3OTE1M2pqNnpk" target="_blank" rel="noopener">@le__stars</a></div>
+    </footer>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const file = document.getElementById('file');
+    const statusEl = document.getElementById('status');
+    const btnCam = document.getElementById('btnCam');
+    const btnTirar = document.getElementById('btnTirar');
+    const btnOCR = document.getElementById('btnOCR');
+    const btnGoogle = document.getElementById('btnGoogle');
+    const btnGoogleGeral = document.getElementById('btnGoogleGeral');
+    const btnCopyChat = document.getElementById('btnCopyChat');
+    const btnCombo = document.getElementById('btnCombo');
+    const btnAsk = document.getElementById('btnAsk');
+    const texto = document.getElementById('texto');
+    const ia = document.getElementById('ia');
+    const askUrl = document.getElementById('askUrl');
+    const bar = document.getElementById('bar');
+
+    let stream = null;
+
+    function setStatus(msg){ statusEl.textContent = msg; }
+
+    async function openCamera(){
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio:false });
+        video.srcObject = stream; await video.play();
+        setStatus('Câmera aberta');
+      }catch(err){
+        alert('Não consegui abrir a câmera. Você pode usar o botão de arquivo.');
+        setStatus('Sem câmera');
+      }
+    }
+
+    function snap(){
+      if(!video.videoWidth){ alert('Abra a câmera antes.'); return; }
+      const w = video.videoWidth, h = video.videoHeight;
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, w, h);
+      canvas.toBlob(function(blob){
+        const f = new File([blob], 'captura.jpg', { type: 'image/jpeg' });
+        const dt = new DataTransfer(); dt.items.add(f); file.files = dt.files;
+        setStatus('Foto capturada');
+      }, 'image/jpeg', 0.92);
+    }
+
+    async function runOCR(){
+      const f = file.files[0];
+      if(!f){ alert('Escolha uma imagem ou use a câmera.'); return; }
+      setStatus('Lendo texto…');
+      updateBar(0);
+      try{
+        const result = await Tesseract.recognize(f, 'por+eng', {
+          logger: function(m){ if(m.status === 'recognizing text'){ updateBar(m.progress); setStatus('OCR: ' + Math.round(m.progress*100) + '%'); } }
+        });
+        let t = result.data && result.data.text ? result.data.text : '';
+        t = t.replace(/[\n\r\t]+/g,' ').replace(/\s{2,}/g,' ').trim();
+        texto.value = t;
+        updateBar(1);
+        setStatus('OCR concluído');
+      }catch(e){
+        console.error(e); updateBar(0); setStatus('Falha no OCR'); alert('Falha no OCR. Tente recortar a área do enunciado.');
+      }
+    }
+
+    function updateBar(p){
+      bar.style.width = Math.max(0, Math.min(100, Math.round(p*100))) + '%';
+    }
+
+    function makeQuery(base){
+      const q = (texto.value || '').trim();
+      if(!q){ alert('Sem texto para pesquisar.'); return null; }
+      return base + encodeURIComponent(q.substring(0, 250));
+    }
+
+    function searchPreferidos(){
+      const base = makeQuery('https://www.google.com/search?q=');
+      if(!base) return;
+      const filtros = ' +(site:passeidireto.com OR filetype:pdf)';
+      window.open(base + encodeURIComponent(filtros), '_blank');
+    }
+
+    function searchGeral(){
+      const base = makeQuery('https://www.google.com/search?q=');
+      if(!base) return;
+      window.open(base, '_blank');
+    }
+
+    async function copyAndOpenChat(){
+      const q = (texto.value || '').trim();
+      if(!q){ alert('Sem texto para copiar.'); return; }
+      try { await navigator.clipboard.writeText(q); setStatus('Texto copiado'); }
+      catch(err) { setStatus('Copie manualmente o texto.'); }
+      window.open('https://chat.openai.com', '_blank');
+    }
+
+    function combo(){
+      searchPreferidos();
+      setTimeout(copyAndOpenChat, 600);
+    }
+
+    async function askAI(){
+      const url = (askUrl && askUrl.value ? askUrl.value : '').trim();
+      if(!url){ alert('Informe a URL do seu endpoint /api/ask'); return; }
+      const q = (texto.value || '').trim();
+      if(!q){ alert('Sem texto para enviar à IA.'); return; }
+      setStatus('Perguntando à IA…');
+      try{
+        const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q, mode: 'resposta-depois-calculo' }) });
+        const data = await r.json();
+        ia.value = data.answer ? data.answer : JSON.stringify(data);
+        setStatus('IA respondeu');
+      }catch(e){ console.error(e); setStatus('Falha na IA'); alert('Não consegui falar com o endpoint /api/ask.'); }
+    }
+
+    btnCam.onclick = openCamera;
+    btnTirar.onclick = snap;
+    btnOCR.onclick = runOCR;
+    btnGoogle.onclick = searchPreferidos;
+    btnGoogleGeral.onclick = searchGeral;
+    btnCopyChat.onclick = copyAndOpenChat;
+    btnCombo.onclick = combo;
+    btnAsk.onclick = askAI;
+  </script>
+</body>
+</html>
